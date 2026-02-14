@@ -107,6 +107,35 @@ st.markdown("""
         border-radius: 4px;
         color: #ffffff;
     }
+    .finding-card {
+        background: #2a2a2a;
+        padding: 15px;
+        border-left: 4px solid #E50914;
+        margin: 10px 0;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        color: #ffffff;
+    }
+    .finding-card h4 {
+        color: #E50914;
+        margin-top: 0;
+    }
+    .recommendation-card {
+        background: #1a1a1a;
+        padding: 15px;
+        border-left: 4px solid #46d369;
+        margin: 10px 0;
+        border-radius: 5px;
+        color: #ffffff;
+    }
+    .recommendation-card h4 {
+        color: #46d369;
+        margin-top: 0;
+    }
+    .recommendation-card p {
+        color: #e5e5e5;
+        margin: 8px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -182,8 +211,275 @@ def generate_data(n_rows=5000):
     
     return df
 
+def generate_comprehensive_analysis(df_filtered, df_full):
+    """
+    Generate complete analysis with key findings, insights, and recommendations
+    """
+    
+    # Calculate key metrics
+    total_views = len(df_filtered)
+    avg_completion = df_filtered['Completion_Percentage'].mean()
+    avg_watch_time = df_filtered['Watch_Time_Mins'].mean()
+    avg_login_days = df_filtered['Last_Login_Days_Ago'].mean()
+    
+    # Content analysis
+    originals_count = df_filtered['Is_Original'].sum()
+    originals_pct = (originals_count / total_views * 100) if total_views > 0 else 0
+    
+    # Genre analysis
+    genre_performance = df_filtered.groupby('Genre').agg({
+        'Completion_Percentage': 'mean',
+        'Watch_Time_Mins': 'mean',
+        'Title_Name': 'count'
+    }).round(2)
+    genre_performance.columns = ['Avg_Completion', 'Avg_Watch_Time', 'View_Count']
+    genre_performance = genre_performance.sort_values('Avg_Completion', ascending=False)
+    
+    top_genre = genre_performance.index[0]
+    top_genre_completion = genre_performance.iloc[0]['Avg_Completion']
+    
+    # Tier analysis
+    tier_performance = df_filtered.groupby('User_Tier').agg({
+        'Watch_Time_Mins': 'mean',
+        'Completion_Percentage': 'mean',
+        'Title_Name': 'count'
+    }).round(2)
+    tier_performance.columns = ['Avg_Watch_Time', 'Avg_Completion', 'User_Count']
+    tier_performance = tier_performance.reindex(['Premium', 'Standard', 'Basic'])
+    
+    # Regional analysis
+    region_performance = df_filtered.groupby('Region').agg({
+        'Watch_Time_Mins': 'mean',
+        'Completion_Percentage': 'mean',
+        'Title_Name': 'count'
+    }).round(2)
+    region_performance.columns = ['Avg_Watch_Time', 'Avg_Completion', 'View_Count']
+    region_performance = region_performance.sort_values('View_Count', ascending=False)
+    
+    top_region = region_performance.index[0]
+    top_region_views = region_performance.iloc[0]['View_Count']
+    
+    # Originals vs Licensed
+    content_type_performance = df_filtered.groupby('Is_Original').agg({
+        'Completion_Percentage': 'mean',
+        'Watch_Time_Mins': 'mean',
+        'Title_Name': 'count'
+    }).round(2)
+    
+    originals_completion = content_type_performance.loc[True, 'Completion_Percentage'] if True in content_type_performance.index else 0
+    licensed_completion = content_type_performance.loc[False, 'Completion_Percentage'] if False in content_type_performance.index else 0
+    
+    # Retention correlation
+    if len(df_filtered) > 10:
+        corr, pval = stats.pearsonr(df_filtered['Completion_Percentage'], df_filtered['Last_Login_Days_Ago'])
+    else:
+        corr, pval = 0, 1
+    
+    # Completion distribution
+    high_completion = len(df_filtered[df_filtered['Completion_Percentage'] >= 75])
+    low_completion = len(df_filtered[df_filtered['Completion_Percentage'] < 25])
+    
+    analysis = {
+        'executive_summary': {
+            'total_views': total_views,
+            'avg_completion': avg_completion,
+            'engagement_level': 'HIGH' if avg_completion >= 70 else 'MEDIUM' if avg_completion >= 50 else 'LOW'
+        },
+        'key_findings': [
+            {
+                'title': '1. Overall Content Performance Metrics',
+                'metrics': [
+                    f"Total Content Views: {total_views:,}",
+                    f"Average Completion Rate: {avg_completion:.1f}%",
+                    f"Average Watch Time: {avg_watch_time:.1f} minutes",
+                    f"Average Days Since Login: {avg_login_days:.1f} days",
+                    f"High Completion Rate (≥75%): {high_completion:,} views ({high_completion/total_views*100:.1f}%)"
+                ],
+                'insight': f"The platform demonstrates {'strong' if avg_completion >= 70 else 'moderate' if avg_completion >= 50 else 'weak'} content engagement with an average completion rate of {avg_completion:.1f}%. Users are watching an average of {avg_watch_time:.1f} minutes per session, indicating {'high' if avg_watch_time >= 60 else 'moderate'} content stickiness."
+            },
+            {
+                'title': '2. Genre Performance Analysis',
+                'metrics': [
+                    f"Top Performing Genre: {top_genre} ({top_genre_completion:.1f}% completion)",
+                    f"Total Active Genres: {len(genre_performance)}",
+                    f"{top_genre} View Count: {genre_performance.loc[top_genre, 'View_Count']:,}",
+                    f"{top_genre} Avg Watch Time: {genre_performance.loc[top_genre, 'Avg_Watch_Time']:.1f} mins"
+                ],
+                'insight': f"{top_genre} content leads in viewer engagement with {top_genre_completion:.1f}% average completion rate. This genre demonstrates strong audience retention and should be prioritized in content acquisition and production strategies."
+            },
+            {
+                'title': '3. User Tier Engagement Patterns',
+                'metrics': [
+                    f"Premium Users: {tier_performance.loc['Premium', 'User_Count']:,} viewers",
+                    f"Premium Avg Watch Time: {tier_performance.loc['Premium', 'Avg_Watch_Time']:.1f} mins",
+                    f"Standard Users: {tier_performance.loc['Standard', 'User_Count']:,} viewers",
+                    f"Basic Users: {tier_performance.loc['Basic', 'User_Count']:,} viewers",
+                    f"Tier Watch Time Difference: {tier_performance.loc['Premium', 'Avg_Watch_Time'] - tier_performance.loc['Basic', 'Avg_Watch_Time']:.1f} mins"
+                ],
+                'insight': f"Premium subscribers watch {tier_performance.loc['Premium', 'Avg_Watch_Time']:.1f} minutes on average, significantly {'higher' if tier_performance.loc['Premium', 'Avg_Watch_Time'] > tier_performance.loc['Basic', 'Avg_Watch_Time'] else 'similar to'} Basic tier users. This validates the premium tier value proposition and suggests opportunities for tier upgrade campaigns."
+            },
+            {
+                'title': '4. Netflix Originals vs Licensed Content',
+                'metrics': [
+                    f"Netflix Originals: {originals_count:,} views ({originals_pct:.1f}%)",
+                    f"Originals Avg Completion: {originals_completion:.1f}%",
+                    f"Licensed Content Avg Completion: {licensed_completion:.1f}%",
+                    f"Performance Gap: {abs(originals_completion - licensed_completion):.1f}% difference"
+                ],
+                'insight': f"Netflix Originals {'outperform' if originals_completion > licensed_completion else 'underperform' if originals_completion < licensed_completion else 'perform similarly to'} licensed content with {originals_completion:.1f}% vs {licensed_completion:.1f}% completion rates. {'This validates the original content strategy and investment.' if originals_completion > licensed_completion else 'This suggests opportunities to improve original content quality or promote existing originals more effectively.'}"
+            },
+            {
+                'title': '5. Regional Market Performance',
+                'metrics': [
+                    f"Leading Region: {top_region} ({top_region_views:,} views)",
+                    f"{top_region} Avg Completion: {region_performance.loc[top_region, 'Avg_Completion']:.1f}%",
+                    f"{top_region} Avg Watch Time: {region_performance.loc[top_region, 'Avg_Watch_Time']:.1f} mins",
+                    f"Active Regions: {len(region_performance)} markets"
+                ],
+                'insight': f"{top_region} dominates viewership with {top_region_views:,} views. Regional content preferences and viewing patterns should inform localized content strategies and marketing campaigns."
+            },
+            {
+                'title': '6. Viewer Retention & Engagement Correlation',
+                'metrics': [
+                    f"Correlation Coefficient: {corr:.4f}",
+                    f"Statistical Significance: {'YES (p < 0.05)' if pval < 0.05 else 'NO (p ≥ 0.05)'}",
+                    f"P-Value: {pval:.6f}",
+                    f"Sample Size: {len(df_filtered):,} views"
+                ],
+                'insight': f"{'Strong negative correlation detected between completion rate and login frequency, indicating that higher content completion directly improves user retention.' if pval < 0.05 and corr < 0 else 'The relationship between content completion and retention requires further investigation with additional data points.'}"
+            },
+            {
+                'title': '7. Content Completion Distribution',
+                'metrics': [
+                    f"High Completion (≥75%): {high_completion:,} views",
+                    f"Low Completion (<25%): {low_completion:,} views",
+                    f"Completion Variance: {df_filtered['Completion_Percentage'].std():.2f}%",
+                    f"Median Completion: {df_filtered['Completion_Percentage'].median():.1f}%"
+                ],
+                'insight': f"Content completion shows {'high' if df_filtered['Completion_Percentage'].std() > 30 else 'moderate'} variance, indicating diverse viewing behaviors. {high_completion:,} sessions achieved high completion (≥75%), while {low_completion:,} sessions show early abandonment, suggesting content matching or quality issues."
+            }
+        ],
+        'strategic_recommendations': [
+            {
+                'priority': 'CRITICAL',
+                'title': 'Optimize Low-Completion Content',
+                'action': f"Investigate the {low_completion:,} viewing sessions with <25% completion rate. Implement A/B testing for thumbnails, descriptions, and first 5-minute content hooks to reduce early abandonment.",
+                'timeline': 'Immediate - Within 2 weeks',
+                'impact': 'High - Could improve overall completion by 10-15%'
+            },
+            {
+                'priority': 'HIGH',
+                'title': f'Double Down on {top_genre} Content',
+                'action': f"Increase {top_genre} content acquisition and production budget by 20-30%. This genre shows {top_genre_completion:.1f}% completion rate, significantly above platform average.",
+                'timeline': 'Within 1 month',
+                'impact': 'High - Proven genre performance'
+            },
+            {
+                'priority': 'HIGH',
+                'title': 'Premium Tier Upsell Campaign',
+                'action': f"Launch targeted campaigns to convert Standard and Basic users to Premium tier. Premium users watch {tier_performance.loc['Premium', 'Avg_Watch_Time']:.0f} minutes vs {tier_performance.loc['Basic', 'Avg_Watch_Time']:.0f} minutes for Basic users.",
+                'timeline': 'Within 3 weeks',
+                'impact': 'Medium-High - Revenue and engagement uplift'
+            },
+            {
+                'priority': 'MEDIUM',
+                'title': 'Regional Content Localization',
+                'action': f"Develop region-specific content strategies for underperforming markets. {top_region} success model should be adapted for other regions with localized content.",
+                'timeline': '1-2 months',
+                'impact': 'Medium - Expand market penetration'
+            },
+            {
+                'priority': 'MEDIUM',
+                'title': 'Originals Quality Improvement' if originals_completion < licensed_completion else 'Leverage Originals Success',
+                'action': f"{'Conduct post-mortem analysis on underperforming originals. Implement stricter greenlight criteria and pilot testing before full production.' if originals_completion < licensed_completion else 'Increase marketing spend on top-performing originals. Use originals as exclusive selling point for new subscriber acquisition.'}",
+                'timeline': '2-3 months',
+                'impact': 'Medium - Content strategy optimization'
+            },
+            {
+                'priority': 'LOW',
+                'title': 'Personalization Algorithm Enhancement',
+                'action': f"Improve recommendation engine to increase completion rates. Current median completion of {df_filtered['Completion_Percentage'].median():.1f}% suggests room for better content-user matching.",
+                'timeline': '3-6 months',
+                'impact': 'Low-Medium - Long-term retention improvement'
+            }
+        ]
+    }
+    
+    return analysis
+
 if 'data' not in st.session_state:
     st.session_state.data = generate_data(5000)
+
+def display_executive_summary(analysis):
+    """Display executive summary section"""
+    st.markdown("## 📊 Executive Summary & Strategic Insights")
+    
+    summary = analysis['executive_summary']
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total Views Analyzed", f"{summary['total_views']:,}")
+    
+    with col2:
+        st.metric("Avg Completion Rate", f"{summary['avg_completion']:.1f}%")
+    
+    with col3:
+        engagement_color = "🟢" if summary['engagement_level'] == 'HIGH' else "🟡" if summary['engagement_level'] == 'MEDIUM' else "🔴"
+        st.metric("Engagement Level", f"{engagement_color} {summary['engagement_level']}")
+    
+    st.markdown("---")
+
+def display_key_findings(analysis):
+    """Display key operational findings"""
+    with st.expander("🔍 **View Complete Analysis & Strategic Recommendations**", expanded=True):
+        st.markdown("### 📈 Key Performance Findings")
+        
+        for finding in analysis['key_findings']:
+            st.markdown(f"""
+            <div class="finding-card">
+                <h4>{finding['title']}</h4>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.markdown("**Key Metrics:**")
+                for metric in finding['metrics']:
+                    st.markdown(f"• {metric}")
+            
+            with col2:
+                st.markdown("**Analysis:**")
+                st.write(finding['insight'])
+            
+            st.markdown("---")
+
+def display_strategic_recommendations(analysis):
+    """Display strategic recommendations"""
+    st.markdown("### 🎯 Strategic Recommendations & Action Plan")
+    
+    # Group by priority
+    critical = [r for r in analysis['strategic_recommendations'] if r['priority'] == 'CRITICAL']
+    high = [r for r in analysis['strategic_recommendations'] if r['priority'] == 'HIGH']
+    medium = [r for r in analysis['strategic_recommendations'] if r['priority'] == 'MEDIUM']
+    low = [r for r in analysis['strategic_recommendations'] if r['priority'] == 'LOW']
+    
+    for priority_group, items in [('🔴 CRITICAL PRIORITY', critical), 
+                                   ('🟠 HIGH PRIORITY', high),
+                                   ('🟡 MEDIUM PRIORITY', medium),
+                                   ('🟢 LOW PRIORITY', low)]:
+        if items:
+            st.markdown(f"#### {priority_group}")
+            for rec in items:
+                st.markdown(f"""
+                <div class="recommendation-card">
+                    <h4>{rec['title']}</h4>
+                    <p><strong>Action:</strong> {rec['action']}</p>
+                    <p><strong>Timeline:</strong> {rec['timeline']} | <strong>Impact:</strong> {rec['impact']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown("")
 
 df_full = st.session_state.data
 
@@ -288,6 +584,14 @@ with st.sidebar:
     st.markdown(f"<h2 style='color: #E50914; margin: 5px 0;'>{len(df_filtered):,}</h2>", unsafe_allow_html=True)
     st.markdown(f"<p style='color: #b3b3b3; margin: 0; font-size: 12px;'>of {len(df_full):,} total ({(len(df_filtered)/len(df_full)*100):.1f}%)</p>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
+
+# Generate and display comprehensive analysis
+if len(df_filtered) > 0:
+    analysis = generate_comprehensive_analysis(df_filtered, df_full)
+    display_executive_summary(analysis)
+    display_key_findings(analysis)
+    display_strategic_recommendations(analysis)
+    st.markdown("---")
 
 tab1, tab2, tab3, tab4 = st.tabs(["📊 OVERVIEW", "📈 ANALYTICS", "🎨 VISUALIZATIONS", "📋 DATA"])
 
