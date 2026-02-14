@@ -193,6 +193,15 @@ st.markdown(f"<p style='text-align: center; color: #b3b3b3;'>Analysis Date: {dat
 st.markdown("---")
 
 with st.sidebar:
+    # Netflix Logo
+    st.markdown("""
+        <div style='text-align: center; padding: 20px 10px 10px 10px;'>
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" 
+                 alt="Netflix Logo" 
+                 style="width: 160px; height: auto;">
+        </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("<h2 style='color: #E50914;'>⚙️ INTERACTIVE FILTERS</h2>", unsafe_allow_html=True)
     st.markdown("<p style='color: #b3b3b3; font-size: 13px;'>All visualizations update in real-time</p>", unsafe_allow_html=True)
     st.markdown("---")
